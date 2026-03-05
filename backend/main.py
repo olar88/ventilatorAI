@@ -210,14 +210,18 @@ async def websocket_vitals(websocket: WebSocket):
 if __name__ == "__main__":
     import uvicorn
     
+    # Get port from environment variable (Railway provides PORT)
+    port = int(os.getenv("PORT", 8000))
+    
     print("=" * 60)
     print("Starting VentAI Backend Server")
+    print(f"Port: {port}")
     print("=" * 60)
     
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=port,
         reload=False,
         log_level="info"
     )
