@@ -21,31 +21,37 @@ ai_service: AIConsultService = None
 active_connections: List[WebSocket] = []
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Initialize services on startup."""
+def ensure_initialized():
+    """
+    Ensure simulator and AI service are initialized.
+    This is needed for serverless environments where lifespan may not work.
+    """
     global simulator, ai_service
     
-    # Initialize with default ARDS settings
-    default_settings = VentilatorSettings(
-        fio2=0.6,
-        peep=12.0,
-        tidal_volume=400.0,
-        respiratory_rate=16,
-        compliance=40.0,  # Reduced for ARDS
-        resistance=15.0   # Increased for ARDS
-    )
-    
-    simulator = PatientSimulator(default_settings)
-    ai_service = AIConsultService()
-    
-    print("(+) VentAI Backend initialized")
-    print(f"  Simulator: RR={default_settings.respiratory_rate} bpm, PEEP={default_settings.peep} cmH2O")
-    print(f"  AI Service: {'OpenAI' if ai_service.client else 'Mock Mode'}")
-    
+    if simulator is None or ai_service is None:
+        # Initialize with default ARDS settings
+        default_settings = VentilatorSettings(
+            fio2=0.6,
+            peep=12.0,
+            tidal_volume=400.0,
+            respiratory_rate=16,
+            compliance=40.0,  # Reduced for ARDS
+            resistance=15.0   # Increased for ARDS
+        )
+        
+        simulator = PatientSimulator(default_settings)
+        ai_service = AIConsultService()
+        
+        print("(+) VentAI Backend initialized (serverless)")
+        print(f"  Simulator: RR={default_settings.respiratory_rate} bpm, PEEP={default_settings.peep} cmH2O")
+        print(f"  AI Service: {'OpenAI' if ai_service.client else 'Mock Mode'}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize services on startup (for non-serverless environments)."""
+    ensure_initialized()
     yield
-    
-    # Cleanup
     print("Shutting down VentAI Backend")
 
 
@@ -87,6 +93,7 @@ app.add_middleware(
 @app.get("/health")
 async def health_check():
     """System health check endpoint."""
+    ensure_initialized()
     return {
         "status": "healthy",
         "service": "VentAI Backend",
@@ -100,6 +107,7 @@ async def health_check():
 @app.get("/api/settings")
 async def get_settings():
     """Get current ventilator settings."""
+    ensure_initialized()
     if not simulator:
         raise HTTPException(status_code=500, detail="Simulator not initialized")
     
@@ -113,6 +121,7 @@ async def update_settings(settings: VentilatorSettings):
     
     The simulator will immediately use the new parameters for waveform generation.
     """
+    ensure_initialized()
     if not simulator:
         raise HTTPException(status_code=500, detail="Simulator not initialized")
     
@@ -133,6 +142,7 @@ async def measure_plateau_pressure():
     The simulator will perform an inspiratory pause on the next breath
     to measure plateau pressure (pressure with zero flow).
     """
+    ensure_initialized()
     if not simulator:
         raise HTTPException(status_code=500, detail="Simulator not initialized")
     
@@ -152,6 +162,7 @@ async def get_ai_consultation(abg: ABGValues):
     Analyzes arterial blood gas values and provides recommendations
     based on ARDSnet protocol and lung-protective ventilation strategies.
     """
+    ensure_initialized()
     if not ai_service:
         raise HTTPException(status_code=500, detail="AI service not initialized")
     
@@ -170,6 +181,7 @@ async def websocket_vitals(websocket: WebSocket):
     - Volume (mL)
     - Phase (inspiration/expiration)
     """
+    ensure_initialized()
     await websocket.accept()
     active_connections.append(websocket)
     
