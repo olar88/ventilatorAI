@@ -12,7 +12,17 @@ class AIConsultService:
     
     def __init__(self):
         self.api_key = os.getenv("OPENAI_API_KEY")
-        self.client = OpenAI(api_key=self.api_key) if self.api_key else None
+        self.client = None
+        
+        # Only initialize OpenAI client if API key is provided
+        if self.api_key:
+            try:
+                self.client = OpenAI(api_key=self.api_key)
+                print("✅ OpenAI client initialized successfully")
+            except Exception as e:
+                print(f"⚠️ Warning: Failed to initialize OpenAI client: {e}")
+                print("ℹ️ AI service will use mock responses")
+                self.client = None
         
     def _get_mock_response(self, abg: ABGValues) -> AIConsultResponse:
         """Generate a mock response when OpenAI API is not available."""
