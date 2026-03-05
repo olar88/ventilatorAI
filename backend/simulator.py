@@ -4,7 +4,8 @@ Patient Simulator - Implements respiratory mechanics physics.
 Uses the Equation of Motion for the respiratory system:
 Pressure(t) = (Volume(t) / Compliance) + (Flow(t) * Resistance) + PEEP
 """
-import numpy as np
+import math
+import random
 import time
 from typing import Tuple
 from models import VentilatorSettings, VitalData
@@ -87,12 +88,12 @@ class PatientSimulator:
         if phase == "inspiration":
             # Sinusoidal flow during inspiration
             # Peak flow = (Tidal Volume / Inspiration Time) * π/2
-            peak_flow = (self.settings.tidal_volume / 1000.0) / self.inspiration_time * (np.pi / 2)
+            peak_flow = (self.settings.tidal_volume / 1000.0) / self.inspiration_time * (math.pi / 2)
             peak_flow_lpm = peak_flow * 60.0  # Convert L/s to L/min
             
             # Sine wave from 0 to π
-            angle = (cycle_time / self.inspiration_time) * np.pi
-            flow = peak_flow_lpm * np.sin(angle)
+            angle = (cycle_time / self.inspiration_time) * math.pi
+            flow = peak_flow_lpm * math.sin(angle)
         else:
             # Exponential decay during expiration
             exp_time = cycle_time - self.inspiration_time
@@ -100,10 +101,10 @@ class PatientSimulator:
             
             # Peak expiratory flow (negative for exhalation)
             peak_exp_flow = -(self.settings.tidal_volume / 1000.0) / tau * 60.0
-            flow = peak_exp_flow * np.exp(-exp_time / tau)
+            flow = peak_exp_flow * math.exp(-exp_time / tau)
         
         # Add realistic noise (±2% of current flow)
-        noise = np.random.normal(0, abs(flow) * 0.02)
+        noise = random.gauss(0, abs(flow) * 0.02)
         return flow + noise
     
     def _calculate_volume(self, flow: float) -> float:
@@ -158,7 +159,7 @@ class PatientSimulator:
         pressure = elastic_pressure + resistive_pressure + self.settings.peep
         
         # Add slight noise (±0.5 cmH2O)
-        noise = np.random.normal(0, 0.5)
+        noise = random.gauss(0, 0.5)
         pressure += noise
         
         # Clamp to realistic range
@@ -174,8 +175,8 @@ class PatientSimulator:
         # Base SpO₂ for ARDS patient
         base = 82 + (self.settings.fio2 * 10)  # ~88 for fio2=0.6
         # Slight oscillation with breathing cycle
-        oscillation = np.sin(self.current_time * 0.5) * 1.5
-        noise = np.random.normal(0, 0.3)
+        oscillation = math.sin(self.current_time * 0.5) * 1.5
+        noise = random.gauss(0, 0.3)
         spo2 = base + oscillation + noise
         return round(max(70.0, min(100.0, spo2)), 1)
 
@@ -186,8 +187,8 @@ class PatientSimulator:
         Tachycardia is common in ARDS, typically 100-130 bpm.
         """
         base = 108
-        oscillation = np.sin(self.current_time * 0.3) * 8
-        noise = np.random.normal(0, 2)
+        oscillation = math.sin(self.current_time * 0.3) * 8
+        noise = random.gauss(0, 2)
         hr = base + oscillation + noise
         return int(max(50, min(180, hr)))
 

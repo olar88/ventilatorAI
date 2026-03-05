@@ -19,8 +19,5 @@
       "src": "/ws/(.*)",
       "dest": "api/index.py"
     }
-  ],
-  "env": {
-    "OPENAI_API_KEY": "@openai-api-key"
-  }
+  ]
 }
