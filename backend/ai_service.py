@@ -4,7 +4,6 @@ AI Consultation Service - Provides clinical recommendations based on ABG values.
 import os
 from typing import Optional
 from models import ABGValues, AIConsultResponse
-from openai import OpenAI
 
 
 class AIConsultService:
@@ -13,16 +12,22 @@ class AIConsultService:
     def __init__(self):
         self.api_key = os.getenv("OPENAI_API_KEY")
         self.client = None
+        self._openai_available = False
         
-        # Only initialize OpenAI client if API key is provided
+        # Lazy load OpenAI only when API key is provided
         if self.api_key:
             try:
+                # Import OpenAI only when needed to avoid startup failures
+                from openai import OpenAI
                 self.client = OpenAI(api_key=self.api_key)
+                self._openai_available = True
                 print("✅ OpenAI client initialized successfully")
-            except Exception as e:
-                print(f"⚠️ Warning: Failed to initialize OpenAI client: {e}")
+            except ImportError as e:
+                print(f"⚠️ OpenAI library not available: {e}")
                 print("ℹ️ AI service will use mock responses")
-                self.client = None
+            except Exception as e:
+                print(f"⚠️ Failed to initialize OpenAI client: {e}")
+                print("ℹ️ AI service will use mock responses")
         
     def _get_mock_response(self, abg: ABGValues) -> AIConsultResponse:
         """Generate a mock response when OpenAI API is not available."""
