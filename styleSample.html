@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VentAI - 智慧呼吸器參數調控助手 (Glassmorphism)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bg: 'var(--color-bg)',
+                        text: 'var(--color-text)',
+                        muted: 'var(--color-muted)',
+                        primary: 'var(--color-primary)',
+                        danger: 'var(--color-danger)',
+                        wave1: 'var(--color-wave1)',
+                        wave2: 'var(--color-wave2)',
+                    },
+                    animation: {
+                        blob: "blob 15s infinite",
+                    },
+                    keyframes: {
+                        blob: {
+                            "0%": { transform: "translate(0px, 0px) scale(1)" },
+                            "33%": { transform: "translate(30px, -50px) scale(1.1)" },
+                            "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
+                            "100%": { transform: "translate(0px, 0px) scale(1)" },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* CSS 變數：主題定義 (加入玻璃與光暈參數) */
+        :root {
+            /* 明亮玻璃模式 (Clinical Day) */
+            --color-bg: #f1f5f9;
+            --color-text: #0f172a;
+            --color-muted: #64748b;
+            --color-primary: #3b82f6;
+            --color-danger: #ef4444;
+            --color-wave1: #0ea5e9;
+            --color-wave2: #8b5cf6;
+
+            /* 玻璃面板參數 */
+            --glass-bg: rgba(255, 255, 255, 0.45);
+            --glass-border: rgba(255, 255, 255, 0.8);
+            --glass-shadow: rgba(15, 23, 42, 0.05);
+
+            /* 背景光暈顏色 */
+            --orb-1: #bfdbfe;
+            --orb-2: #ddd6fe;
+            --orb-3: #bae6fd;
+        }
+
+        [data-theme="icu-night"] {
+            /* ICU 深色玻璃模式 */
+            --color-bg: #09090b;
+            --color-text: #f8fafc;
+            --color-muted: #94a3b8;
+            --color-primary: #06b6d4;
+            --color-danger: #f43f5e;
+            --color-wave1: #22d3ee;
+            --color-wave2: #a78bfa;
+
+            /* 玻璃面板參數 */
+            --glass-bg: rgba(24, 24, 27, 0.45);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-shadow: rgba(0, 0, 0, 0.4);
+
+            /* 背景光暈顏色 */
+            --orb-1: rgba(6, 182, 212, 0.15);
+            /* Cyan */
+            --orb-2: rgba(139, 92, 246, 0.15);
+            /* Purple */
+            --orb-3: rgba(59, 130, 246, 0.15);
+            /* Blue */
+        }
+
+        body {
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            transition: background-color 0.5s ease, color 0.5s ease;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            /* 讓滾動條變得圓滑隱形 */
+            scrollbar-width: thin;
+            scrollbar-color: var(--color-muted) transparent;
+        }
+
+        /* 核心玻璃擬物化 Class */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 var(--glass-shadow);
+            border-radius: 1.5rem;
+            /* 24px 圓角 */
+            transition: all 0.5s ease;
+        }
+
+        .glass-button {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 9999px;
+            /* 膠囊圓角 */
+            transition: all 0.3s ease;
+        }
+
+        .glass-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .glass-button.active {
+            background: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
+            box-shadow: 0 4px 15px -3px var(--color-primary);
+        }
+
+        /* 圓滑的波形掃描線 */
+        .scan-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(to bottom, transparent, var(--color-primary), transparent);
+            box-shadow: 0 0 15px var(--color-primary);
+            border-radius: 4px;
+            z-index: 10;
+            opacity: 0.8;
+        }
+
+        /* 背景環境光暈 */
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            z-index: -1;
+            transition: background-color 0.5s ease;
+        }
+
+        .orb-1 {
+            background-color: var(--orb-1);
+            top: -10%;
+            left: -10%;
+            width: 40vw;
+            height: 40vw;
+        }
+
+        .orb-2 {
+            background-color: var(--orb-2);
+            top: 20%;
+            right: -10%;
+            width: 35vw;
+            height: 35vw;
+            animation-delay: 2s;
+        }
+
+        .orb-3 {
+            background-color: var(--orb-3);
+            bottom: -20%;
+            left: 20%;
+            width: 45vw;
+            height: 45vw;
+            animation-delay: 4s;
+        }
+
+        /* 特殊高亮面板 (例如警告或AI) */
+        .glass-panel.highlight-danger {
+            background: linear-gradient(135deg, var(--glass-bg), rgba(239, 68, 68, 0.05));
+            border-left: 4px solid var(--color-danger);
+        }
+
+        .glass-panel.highlight-ai {
+            background: linear-gradient(135deg, var(--glass-bg), rgba(59, 130, 246, 0.05));
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        /* 內部小區塊玻璃感 */
+        .glass-inner {
+            background: rgba(0, 0, 0, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 1rem;
+        }
+
+        [data-theme="icu-night"] .glass-inner {
+            background: rgba(255, 255, 255, 0.03);
+        }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col overflow-hidden relative" data-theme="icu-night">
+
+    <!-- 動態背景光暈 (Orbs) -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="orb orb-1 animate-blob"></div>
+        <div class="orb orb-2 animate-blob"></div>
+        <div class="orb orb-3 animate-blob"></div>
+    </div>
+
+    <!-- Navbar -->
+    <header class="glass-panel m-4 px-6 py-4 flex justify-between items-center shrink-0 z-10">
+        <div class="flex items-center gap-4">
+            <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center backdrop-blur-md">
+                <i data-lucide="activity" class="text-primary w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">Vent<span class="text-primary">AI</span></h1>
+                <p class="text-xs text-muted font-medium">Smart Ventilator Hub</p>
+            </div>
+        </div>
+
+        <!-- Patient Info -->
+        <div class="hidden md:flex items-center gap-8 text-sm px-6 py-2 glass-inner">
+            <div class="flex flex-col items-center">
+                <span class="text-muted text-xs mb-0.5">病歷號</span>
+                <span class="font-bold">#A883921</span>
+            </div>
+            <div class="w-px h-8 bg-border opacity-20"></div>
+            <div class="flex flex-col items-center">
+                <span class="text-muted text-xs mb-0.5">病患</span>
+                <span class="font-bold">陳 X 明 (68Y)</span>
+            </div>
+            <div class="w-px h-8 bg-border opacity-20"></div>
+            <div class="flex flex-col items-center">
+                <span class="text-muted text-xs mb-0.5">診斷</span>
+                <span class="font-bold text-primary">Severe ARDS</span>
+            </div>
+        </div>
+
+        <!-- Theme Switcher -->
+        <div class="flex items-center gap-2 p-1 glass-inner rounded-full">
+            <button onclick="setTheme('clinical-day')"
+                class="theme-btn glass-button px-4 py-2 text-sm font-medium flex items-center"
+                data-target="clinical-day">
+                <i data-lucide="sun" class="w-4 h-4 mr-2"></i>明亮
+            </button>
+            <button onclick="setTheme('icu-night')"
+                class="theme-btn glass-button active px-4 py-2 text-sm font-medium flex items-center shadow-lg"
+                data-target="icu-night">
+                <i data-lucide="moon" class="w-4 h-4 mr-2"></i>深色
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex overflow-hidden px-4 pb-4 gap-4 z-10">
+
+        <!-- Left Column: Waveforms (Canvas) -->
+        <section class="flex-1 flex flex-col gap-4">
+            <!-- Pressure Waveform -->
+            <div class="glass-panel flex-1 flex flex-col relative overflow-hidden group">
+                <div class="px-6 py-4 flex justify-between items-center z-10">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 rounded-xl bg-wave1/10">
+                            <i data-lucide="waves" class="w-5 h-5 text-wave1"></i>
+                        </div>
+                        <h2 class="font-semibold text-sm tracking-wide">壓力波形 (Paw) <span
+                                class="text-muted text-xs ml-1 font-normal">cmH2O</span></h2>
+                    </div>
+                    <div class="text-3xl font-black text-wave1 drop-shadow-md" id="val-pip">28</div>
+                </div>
+                <!-- 漸層遮罩讓邊緣柔和 -->
+                <div
+                    class="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-bg/20 to-transparent pointer-events-none z-10">
+                </div>
+
+                <div class="flex-1 relative w-full h-full -mt-2" id="canvas-container-1">
+                    <canvas id="pressureCanvas" class="absolute inset-0 w-full h-full"></canvas>
+                    <div id="scanline1" class="scan-line"></div>
+                </div>
+            </div>
+
+            <!-- Flow Waveform -->
+            <div class="glass-panel flex-1 flex flex-col relative overflow-hidden group">
+                <div class="px-6 py-4 flex justify-between items-center z-10">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 rounded-xl bg-wave2/10">
+                            <i data-lucide="wind" class="w-5 h-5 text-wave2"></i>
+                        </div>
+                        <h2 class="font-semibold text-sm tracking-wide">流量波形 (Flow) <span
+                                class="text-muted text-xs ml-1 font-normal">L/min</span></h2>
+                    </div>
+                    <div class="text-3xl font-black text-wave2 drop-shadow-md" id="val-flow">60</div>
+                </div>
+
+                <div class="flex-1 relative w-full h-full -mt-2" id="canvas-container-2">
+                    <canvas id="flowCanvas" class="absolute inset-0 w-full h-full"></canvas>
+                    <div id="scanline2" class="scan-line"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Column: Data & AI -->
+        <aside class="w-96 flex flex-col gap-4 overflow-y-auto pr-1 pb-1">
+
+            <!-- Vitals Grid -->
+            <div class="grid grid-cols-2 gap-4">
+                <div class="glass-panel highlight-danger p-5 flex flex-col justify-between relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 opacity-10">
+                        <i data-lucide="activity" class="w-24 h-24 text-danger"></i>
+                    </div>
+                    <span class="text-sm text-muted font-medium z-10">SpO2 (%)</span>
+                    <div class="flex items-end justify-between mt-4 z-10">
+                        <span class="text-5xl font-black text-danger drop-shadow-md">88</span>
+                        <div class="bg-danger/20 p-2 rounded-full backdrop-blur-sm animate-pulse">
+                            <i data-lucide="alert-triangle" class="w-5 h-5 text-danger"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-panel p-5 flex flex-col justify-between relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 opacity-5">
+                        <i data-lucide="heart" class="w-24 h-24 text-wave2"></i>
+                    </div>
+                    <span class="text-sm text-muted font-medium z-10">HR (bpm)</span>
+                    <div class="flex items-end justify-between mt-4 z-10">
+                        <span class="text-5xl font-bold drop-shadow-sm">112</span>
+                        <div class="bg-wave2/10 p-2 rounded-full backdrop-blur-sm">
+                            <i data-lucide="heart-pulse" class="w-5 h-5 text-wave2"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ventilator Settings -->
+            <div class="glass-panel flex flex-col p-5">
+                <h2 class="font-semibold text-sm flex items-center gap-2 mb-4">
+                    <div class="p-1.5 rounded-lg bg-primary/10">
+                        <i data-lucide="sliders-horizontal" class="w-4 h-4 text-primary"></i>
+                    </div>
+                    呼吸器設定 (PCV)
+                </h2>
+
+                <div class="grid grid-cols-3 gap-3 text-center mb-4">
+                    <div
+                        class="glass-inner p-3 flex flex-col justify-center items-center hover:bg-white/5 transition-colors cursor-pointer">
+                        <div class="text-xs text-muted mb-1">FiO2</div>
+                        <div class="text-2xl font-bold text-primary">60<span class="text-sm font-normal">%</span></div>
+                    </div>
+                    <div
+                        class="glass-inner p-3 flex flex-col justify-center items-center hover:bg-white/5 transition-colors cursor-pointer">
+                        <div class="text-xs text-muted mb-1">PEEP</div>
+                        <div class="text-2xl font-bold text-primary">12</div>
+                    </div>
+                    <div
+                        class="glass-inner p-3 flex flex-col justify-center items-center hover:bg-white/5 transition-colors cursor-pointer">
+                        <div class="text-xs text-muted mb-1">RR</div>
+                        <div class="text-2xl font-bold text-primary">20</div>
+                    </div>
+                </div>
+                <div class="glass-inner px-4 py-3 flex justify-between items-center text-sm rounded-xl">
+                    <span class="text-muted flex items-center gap-2">
+                        <i data-lucide="activity-square" class="w-4 h-4"></i> Cdyn
+                    </span>
+                    <span class="font-mono font-bold text-base">25 <span
+                            class="text-xs font-normal opacity-70">ml/cmH2O</span></span>
+                </div>
+            </div>
+
+            <!-- AI Agent Consultant Panel -->
+            <div class="glass-panel highlight-ai flex-1 flex flex-col relative overflow-hidden">
+                <!-- AI 專屬光暈 -->
+                <div
+                    class="absolute top-0 right-0 w-48 h-48 bg-primary/20 rounded-full blur-[60px] pointer-events-none">
+                </div>
+
+                <div class="px-5 py-4 border-b border-white/5 flex justify-between items-center z-10 backdrop-blur-sm">
+                    <h2 class="font-semibold flex items-center gap-2 text-primary">
+                        <i data-lucide="sparkles" class="w-5 h-5"></i> AI 決策輔助
+                    </h2>
+                    <span
+                        class="text-[10px] bg-primary/20 border border-primary/30 text-primary px-3 py-1 rounded-full font-bold uppercase tracking-wider shadow-[0_0_10px_rgba(59,130,246,0.2)]">Active</span>
+                </div>
+
+                <div class="p-5 flex-1 flex flex-col gap-4 z-10 overflow-y-auto">
+                    <!-- Event Trigger -->
+                    <div class="text-sm border-l-2 border-danger pl-4 py-1 relative">
+                        <div
+                            class="absolute -left-[5px] top-2 w-2 h-2 rounded-full bg-danger shadow-[0_0_8px_rgba(239,68,68,0.8)]">
+                        </div>
+                        <p class="text-danger font-bold text-xs mb-1 tracking-wider">異常偵測</p>
+                        <p class="text-muted leading-relaxed">SpO2 下降至 88%，且 Cdyn 偏低 (25)。</p>
+                    </div>
+
+                    <!-- AI Response Area -->
+                    <div class="glass-inner p-4 text-sm flex-1 relative group">
+                        <div class="flex gap-3 mb-3 items-center">
+                            <div
+                                class="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center shrink-0 border border-white/10 shadow-lg">
+                                <i data-lucide="bot" class="w-4 h-4 text-white drop-shadow-md"></i>
+                            </div>
+                            <div class="font-semibold text-primary/90 text-base">ARDSnet 協議建議</div>
+                        </div>
+                        <ul class="space-y-3 text-muted leading-relaxed pl-1">
+                            <li class="flex items-start gap-2">
+                                <i data-lucide="arrow-right-circle" class="w-4 h-4 text-primary/70 mt-0.5 shrink-0"></i>
+                                <span>中重度 ARDS，建議執行 <strong class="text-text font-semibold">Lung
+                                        Recruitment</strong>。</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i data-lucide="arrow-right-circle" class="w-4 h-4 text-primary/70 mt-0.5 shrink-0"></i>
+                                <span>將 <strong class="text-text font-semibold">PEEP 調升至 14</strong> 以改善氧合。</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i data-lucide="arrow-right-circle" class="w-4 h-4 text-primary/70 mt-0.5 shrink-0"></i>
+                                <span>監控 Plateau Pressure <strong class="text-text font-semibold">&lt; 30
+                                        cmH2O</strong>。</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Action Button -->
+                    <button
+                        class="w-full bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-white font-semibold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_8px_20px_-5px_rgba(59,130,246,0.5)] hover:shadow-[0_8px_25px_-5px_rgba(59,130,246,0.7)] hover:-translate-y-0.5">
+                        <i data-lucide="check-circle-2" class="w-5 h-5"></i> 接受建議並生成醫囑
+                    </button>
+                </div>
+            </div>
+
+        </aside>
+    </main>
+
+    <script>
+        lucide.createIcons();
+
+        function setTheme(themeName) {
+            document.body.setAttribute('data-theme', themeName);
+
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                if (btn.dataset.target === themeName) {
+                    btn.classList.add('active', 'shadow-lg');
+                } else {
+                    btn.classList.remove('active', 'shadow-lg');
+                }
+            });
+
+            updateCanvasColors();
+        }
+
+        const canvasPaw = document.getElementById('pressureCanvas');
+        const canvasFlow = document.getElementById('flowCanvas');
+        const ctxPaw = canvasPaw.getContext('2d');
+        const ctxFlow = canvasFlow.getContext('2d');
+
+        let waveColor1 = '#06b6d4';
+        let waveColor2 = '#a78bfa';
+
+        function updateCanvasColors() {
+            const style = getComputedStyle(document.body);
+            waveColor1 = style.getPropertyValue('--color-wave1').trim();
+            waveColor2 = style.getPropertyValue('--color-wave2').trim();
+        }
+
+        function resizeCanvas() {
+            const container1 = document.getElementById('canvas-container-1');
+            const container2 = document.getElementById('canvas-container-2');
+
+            canvasPaw.width = container1.clientWidth;
+            canvasPaw.height = container1.clientHeight;
+
+            canvasFlow.width = container2.clientWidth;
+            canvasFlow.height = container2.clientHeight;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        const duration = 5000;
+        let dataBufferPaw = [];
+        let dataBufferFlow = [];
+        const maxPoints = 500;
+
+        for (let i = 0; i < maxPoints; i++) {
+            dataBufferPaw.push(null);
+            dataBufferFlow.push(null);
+        }
+
+        function generateWaveData(t) {
+            const cycle = 3000;
+            const tInCycle = t % cycle;
+            const iTime = 1000;
+
+            let pressure, flow;
+
+            if (tInCycle < iTime) {
+                pressure = 5 + (28 - 5) * Math.min(1, tInCycle / 150);
+                flow = 60 * Math.max(0, 1 - (tInCycle / iTime));
+            } else {
+                pressure = 5 + (28 - 5) * Math.max(0, 1 - ((tInCycle - iTime) / 150));
+                flow = -60 * Math.exp(-(tInCycle - iTime) / 200);
+            }
+
+            // 平滑化雜訊，讓線條不會過於刺角，符合圓滑設計
+            pressure += (Math.sin(t / 50) * 0.3) + ((Math.random() - 0.5) * 0.2);
+            flow += (Math.cos(t / 30) * 0.5) + ((Math.random() - 0.5) * 0.5);
+
+            return { pressure, flow };
+        }
+
+        function drawWaveforms() {
+            const now = performance.now();
+            const progress = (now % duration) / duration;
+            const currentIndex = Math.floor(progress * maxPoints);
+
+            const { pressure, flow } = generateWaveData(now);
+
+            dataBufferPaw[currentIndex] = pressure;
+            dataBufferFlow[currentIndex] = flow;
+            for (let i = 1; i <= 15; i++) {
+                let clearIdx = (currentIndex + i) % maxPoints;
+                dataBufferPaw[clearIdx] = null;
+                dataBufferFlow[clearIdx] = null;
+            }
+
+            // --- 繪製壓力波形 (加入發光霓虹效果) ---
+            ctxPaw.clearRect(0, 0, canvasPaw.width, canvasPaw.height);
+            ctxPaw.beginPath();
+            ctxPaw.strokeStyle = waveColor1;
+            ctxPaw.lineWidth = 3.5; // 加粗線條
+            ctxPaw.lineCap = 'round'; // 圓滑端點
+            ctxPaw.lineJoin = 'round'; // 圓滑轉折
+            // 發光設定
+            ctxPaw.shadowBlur = 12;
+            ctxPaw.shadowColor = waveColor1;
+
+            for (let i = 0; i < maxPoints; i++) {
+                if (dataBufferPaw[i] === null) {
+                    ctxPaw.stroke();
+                    ctxPaw.beginPath();
+                    continue;
+                }
+                const x = (i / maxPoints) * canvasPaw.width;
+                const y = canvasPaw.height - ((dataBufferPaw[i] / 40) * canvasPaw.height * 0.7) - 20;
+                if (i === 0 || dataBufferPaw[i - 1] === null) ctxPaw.moveTo(x, y);
+                else ctxPaw.lineTo(x, y);
+            }
+            ctxPaw.stroke();
+
+            // --- 繪製流量波形 (加入發光霓虹效果) ---
+            ctxFlow.clearRect(0, 0, canvasFlow.width, canvasFlow.height);
+            ctxFlow.beginPath();
+            ctxFlow.strokeStyle = waveColor2;
+            ctxFlow.lineWidth = 3.5;
+            ctxFlow.lineCap = 'round';
+            ctxFlow.lineJoin = 'round';
+            ctxFlow.shadowBlur = 12;
+            ctxFlow.shadowColor = waveColor2;
+
+            for (let i = 0; i < maxPoints; i++) {
+                if (dataBufferFlow[i] === null) {
+                    ctxFlow.stroke();
+                    ctxFlow.beginPath();
+                    continue;
+                }
+                const x = (i / maxPoints) * canvasFlow.width;
+                const y = (canvasFlow.height / 2) - ((dataBufferFlow[i] / 80) * (canvasFlow.height / 2) * 0.7);
+                if (i === 0 || dataBufferFlow[i - 1] === null) ctxFlow.moveTo(x, y);
+                else ctxFlow.lineTo(x, y);
+            }
+            ctxFlow.stroke();
+
+            // 清除 shadow 來畫基線，避免發光
+            ctxFlow.shadowBlur = 0;
+            ctxFlow.beginPath();
+            ctxFlow.strokeStyle = 'rgba(150, 150, 150, 0.2)';
+            ctxFlow.lineWidth = 2;
+            ctxFlow.moveTo(0, canvasFlow.height / 2);
+            ctxFlow.lineTo(canvasFlow.width, canvasFlow.height / 2);
+            ctxFlow.stroke();
+
+            // 更新掃描線 UI
+            const scanPos = `${progress * 100}%`;
+            document.getElementById('scanline1').style.left = scanPos;
+            document.getElementById('scanline2').style.left = scanPos;
+
+            if (currentIndex % 15 === 0) {
+                document.getElementById('val-pip').innerText = Math.round(Math.max(...dataBufferPaw.filter(v => v !== null)));
+            }
+
+            requestAnimationFrame(drawWaveforms);
+        }
+
+        setTimeout(() => {
+            updateCanvasColors();
+            resizeCanvas();
+            requestAnimationFrame(drawWaveforms);
+        }, 100);
+
+    </script>
+</body>
+
+</html>
